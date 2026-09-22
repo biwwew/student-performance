@@ -1,0 +1,142 @@
+"""
+Student Performance Prediction using Logistic Regression
+----------------------------------------------------------
+Industrial Training Project - Python Programming
+Predicts whether a student will Pass or Fail based on:
+    1. Hours Studied
+    2. Attendance (%)
+    3. Previous Score
+
+Pipeline: Pandas (data handling) -> Matplotlib (visualization)
+          -> Scikit-learn (model building & evaluation)
+
+Run:
+    pip install pandas matplotlib scikit-learn numpy
+    python student_performance_prediction.py
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+# ----------------------------------------------------------------------
+# 1. CREATE / LOAD THE DATASET
+# ----------------------------------------------------------------------
+# If you have your own CSV (e.g. from Kaggle's Student Performance
+# Prediction and Behavior Dataset), replace this block with:
+#     df = pd.read_csv("student_data.csv")
+# It must contain columns: Hours_Studied, Attendance, Previous_Score, Result
+#
+# For now, a reproducible synthetic dataset of 100 students is generated,
+# matching the structure used in the project (80 train / 20 test).
+
+np.random.seed(42)
+n_students = 100
+
+hours_studied = np.round(np.random.uniform(0.5, 9.5, n_students), 1)
+attendance = np.round(np.random.uniform(50, 100, n_students), 1)
+previous_score = np.round(np.random.uniform(30, 95, n_students), 1)
+
+# Underlying "true" pattern: more hours, attendance, and prior score
+# increase the chance of passing (plus some random noise, like real data)
+score = (
+    0.55 * hours_studied
+    + 0.06 * attendance
+    + 0.05 * previous_score
+    + np.random.normal(0, 0.6, n_students)
+)
+threshold = np.percentile(score, 45)  # roughly balanced Pass/Fail split
+result = np.where(score >= threshold, "Pass", "Fail")
+
+df = pd.DataFrame({
+    "Hours_Studied": hours_studied,
+    "Attendance": attendance,
+    "Previous_Score": previous_score,
+    "Result": result,
+})
+
+print("First 5 rows of the dataset:")
+print(df.head(), "\n")
+print("Class balance:")
+print(df["Result"].value_counts(), "\n")
+
+# ----------------------------------------------------------------------
+# 2. DATA PREPARATION (Pandas)
+# ----------------------------------------------------------------------
+df.dropna(inplace=True)  # remove any missing values, if present
+
+X = df[["Hours_Studied", "Attendance", "Previous_Score"]]
+y = df["Result"]
+
+# ----------------------------------------------------------------------
+# 3. TRAIN-TEST SPLIT (80 train / 20 test, as in the project)
+# ----------------------------------------------------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.20, random_state=42, stratify=y
+)
+print(f"Training records: {len(X_train)}")
+print(f"Test records:     {len(X_test)}\n")
+
+# ----------------------------------------------------------------------
+# 4. MODEL BUILDING (Scikit-learn: Logistic Regression)
+# ----------------------------------------------------------------------
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# ----------------------------------------------------------------------
+# 5. PREDICTION & EVALUATION
+# ----------------------------------------------------------------------
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+
+print(f"Test Accuracy: {accuracy * 100:.0f}%")
+print(f"Correct predictions: {(y_pred == y_test.values).sum()} of {len(y_test)}\n")
+
+print("Confusion Matrix (rows = actual, columns = predicted):")
+print(confusion_matrix(y_test, y_pred, labels=["Pass", "Fail"]), "\n")
+
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+
+# Feature importance (logistic regression coefficients)
+coeffs = pd.Series(model.coef_[0], index=X.columns).sort_values(ascending=False)
+print("Feature influence on Pass probability (higher = stronger positive effect):")
+print(coeffs, "\n")
+
+# ----------------------------------------------------------------------
+# 6. TRY A NEW / CUSTOM STUDENT PREDICTION
+# ----------------------------------------------------------------------
+new_student = pd.DataFrame({
+    "Hours_Studied": [6.5],
+    "Attendance": [82],
+    "Previous_Score": [70],
+})
+prediction = model.predict(new_student)[0]
+probability = model.predict_proba(new_student)[0]
+print(f"New student prediction: {prediction}")
+print(f"Probability -> Pass: {probability[list(model.classes_).index('Pass')]:.2f}, "
+      f"Fail: {probability[list(model.classes_).index('Fail')]:.2f}\n")
+
+# ----------------------------------------------------------------------
+# 7. VISUALIZATION (Matplotlib) - matches Figure 1 in the report
+# ----------------------------------------------------------------------
+plt.figure(figsize=(8, 6))
+colors = df["Result"].map({"Pass": "green", "Fail": "red"})
+plt.scatter(df["Hours_Studied"], df["Previous_Score"], c=colors, alpha=0.8, edgecolors="white")
+
+plt.xlabel("Hours Studied")
+plt.ylabel("Previous Score")
+plt.title("Predicted Outcome by Study Hours & Prior Score")
+
+# Manual legend
+pass_dot = plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="green", markersize=9, label="Pass")
+fail_dot = plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="red", markersize=9, label="Fail")
+plt.legend(handles=[pass_dot, fail_dot])
+
+plt.tight_layout()
+plt.savefig("results_chart.png", dpi=150)
+print("Chart saved as results_chart.png")
+# plt.show()  # uncomment to display interactively
